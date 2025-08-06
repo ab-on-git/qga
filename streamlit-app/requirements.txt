@@ -1,0 +1,9 @@
+streamlit
+google-cloud-storage
+google-cloud-aiplatform
+google-cloud-bigquery
+PyPDF2
+requests
+langchain 
+faiss-cpu 
+sentence-transformers
