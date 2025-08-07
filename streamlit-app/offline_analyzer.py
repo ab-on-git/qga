@@ -13,6 +13,8 @@ from utils import (
     store_feedback_bq,
     get_access_token, # Needed for some setups, good practice to have
 )
+from google.cloud import bigquery
+
 
 # --- Configuration ---
 BUCKET_NAME = os.getenv("BUCKET_NAME")
@@ -147,6 +149,13 @@ def run_batch_analysis():
         print("Please ensure BUCKET_NAME, PROJECT_ID, DATASET_ID, and TABLE_ID are exported.")
         return
 
+    # --- Truncate the feedback table ---
+    print(f"Truncating BigQuery table: {PROJECT_ID}.{DATASET_ID}.{TABLE_ID}")
+    client = bigquery.Client(project=PROJECT_ID)
+    table_ref = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
+    client.query(f"TRUNCATE TABLE `{table_ref}`").result()
+    print("Table truncated successfully.")
+
     print(f"Starting batch analysis for PDFs in gs://{BUCKET_NAME}...")
     pdf_files = list_pdfs(BUCKET_NAME)
 
@@ -167,6 +176,7 @@ def run_batch_analysis():
         try:
             # This function already filters headers, footers, and disclaimers
             text, dt = extract_text_from_pdf_gcs(BUCKET_NAME, pdf_file)
+
             if not text:
                 print(f"Warning: No text could be extracted from {pdf_file}. Skipping.")
                 continue
@@ -182,6 +192,7 @@ def run_batch_analysis():
                 "prediction_text": prediction_text,
                 "parsed_sentiment": json.dumps(parsed_data),
                 "predicted_labels": json.dumps(predicted_labels),
+                "document_dt": dt,
                 "is_different": False, "USER": "batch"
             }
 
