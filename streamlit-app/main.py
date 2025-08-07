@@ -6,6 +6,8 @@ import json
 from google.cloud import bigquery
 from datetime import datetime, timedelta
 
+st.set_page_config(layout="wide") 
+
 # Constants
 BUCKET_NAME = os.getenv("BUCKET_NAME")
 PROJECT_ID = os.getenv("PROJECT_ID")
@@ -53,7 +55,7 @@ def parse_sentiment_response(sentiment_text):
     return parsed_data
 
 def get_prediction(text):
-    prompt = f"""You are a financial analyst. Based on the following text, give a sentiment (Buy, Sell, or Hold) and a brief two-sentence rationale for each asset class: "Equity", "Fixed Income", "Commodities", "Real Estate", "Crypto".
+    prompt = f"""You are a financial analyst. Based on the following text, give a sentiment (Buy, Sell, or Hold) and a brief four-sentence rationale for each asset class: "Equity", "Fixed Income", "Commodities", "Real Estate", "Crypto".
 
 Respond with each asset class on a new line, in the format 'Asset Class: Sentiment | Rationale'. For example:
 Equity: Buy | Positive earnings outlook and strong market momentum.
@@ -158,19 +160,39 @@ if st.session_state.sentiment:
     asset_classes = ["Equity", "Fixed Income", "Commodities", "Real Estate", "Crypto"]
     options = ["Buy", "Sell", "Hold"]
 
-    # Display rationales in a more structured way
     with st.container(border=True):
         st.markdown("#### Model Sentiments & Rationales")
+        sentiment_colors = {
+            "Buy": "#d4edda",    # light green
+            "Sell": "#f8d7da",   # light red
+            "Hold": "#fff3cd",   # light orange/yellow
+            "N/A": "#f0f0f0"     # gray fallback
+        }
+        sentiment_symbols = {
+            "Buy": "<span style='color:green;font-size:1.5em;'>⬆</span>",
+            "Sell": "<span style='color:red;font-size:1.5em;'>⬇</span>",
+            "Hold": "<span style='color:orange;font-size:1.5em;'>-</span>",
+            "N/A": "<span style='color:gray;'>?</span>"
+        }
         cols = st.columns(len(asset_classes))
         for i, asset in enumerate(asset_classes):
             with cols[i]:
-                st.markdown(f"**{asset}**")
                 sentiment = sentiment_data.get(asset, {}).get('sentiment', 'N/A')
                 rationale = sentiment_data.get(asset, {}).get('rationale', 'N/A')
-                st.markdown(f"**Sentiment:** {sentiment}")
-                st.caption(rationale)
+                color = sentiment_colors.get(sentiment, "#f0f0f0")
+                symbol = sentiment_symbols.get(sentiment, sentiment_symbols["N/A"])
+                st.markdown(
+                    f"""
+                    <div style="background-color:{color};padding:16px;border-radius:10px;text-align:center;">
+                        <strong>{asset}</strong><br>
+                        <span style="font-size:1.2em;">{symbol} {sentiment}</span>
+                        <div style="font-size:0.9em;margin-top:8px;">{rationale}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
-    st.subheader("Please verify or correct the labels below (for SFT training)")
+    st.subheader("Feedback on Sentiment")
 
     labels = {}
     # Use a form to group the radio buttons and the submit button
