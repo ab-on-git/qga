@@ -2,8 +2,11 @@ streamlit
 google-cloud-storage
 google-cloud-aiplatform
 google-cloud-bigquery
-PyPDF2
 requests
 langchain 
 faiss-cpu 
 sentence-transformers
+pymupdf
+sentence-transformers
+faiss-cpu
+langchain-text-splitters
