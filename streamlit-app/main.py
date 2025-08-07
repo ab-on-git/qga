@@ -62,12 +62,12 @@ Equity: Buy | Positive earnings outlook and strong market momentum.
 Fixed Income: Hold | Yields are stable but there is potential for volatility.
 
 Text:
-{text[:7_000]}"""
+{text[:20_000]}"""
     # Use the centralized Gemini function
     return generate_gemini_content(prompt)
 
 # Streamlit UI
-st.title("Financial Sentiment Classifier")
+st.title("CIO Insight - Advice on Market Sentiments")
 
 # Initialize session state to hold analysis results across reruns
 if "sentiment" not in st.session_state:
@@ -111,8 +111,12 @@ days = range_options[selected_range]
 
 doc_names = get_documents_in_range(PROJECT_ID, DATASET_ID, TABLE_ID, days)
 if doc_names:
-    st.markdown("**Documents in selected range:**")
-    st.write(doc_names)
+    with st.expander(f"**{len(doc_names)} documents found in selected range**", expanded=True):
+        # Create a markdown string with a bulleted list of documents
+        doc_list_md = ""
+        for doc in doc_names:
+            doc_list_md += f"- `{doc}`\n"
+        st.markdown(doc_list_md)
 else:
     st.info("No documents found in the selected date range.")
 

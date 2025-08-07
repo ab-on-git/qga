@@ -11,6 +11,7 @@ import requests
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
 import re
+from datetime import datetime, timedelta
 
 # --- Configuration ---
 SERVICE_ACCOUNT_FILE = "key.json"
@@ -145,21 +146,29 @@ def load_embedding_model():
 
 @st.cache_resource
 def load_vector_store():
-    """Loads the FAISS index and metadata from the local directory."""
+    """Downloads and loads the FAISS index and metadata from GCS."""
+    bucket_name = "hackathon-qga"
+    prefix = "CIOInsights/vectors"
     index_path = os.path.join(VECTOR_STORE_DIR, "index.faiss")
     metadata_path = os.path.join(VECTOR_STORE_DIR, "metadata.pkl")
-
-    if not os.path.exists(index_path) or not os.path.exists(metadata_path):
-        st.error(f"Vector store not found in '{VECTOR_STORE_DIR}'. Please run `vector_builder.py` first.")
-        return None, None
+    os.makedirs(VECTOR_STORE_DIR, exist_ok=True)
 
     try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+
+        print(f"Downloading index from gs://{bucket_name}/{prefix}/index.faiss")
+        bucket.blob(f"{prefix}/index.faiss").download_to_filename(index_path)
+
+        print(f"Downloading metadata from gs://{bucket_name}/{prefix}/metadata.pkl")
+        bucket.blob(f"{prefix}/metadata.pkl").download_to_filename(metadata_path)
+
         index = faiss.read_index(index_path)
         with open(metadata_path, "rb") as f:
             metadata = pickle.load(f)
         return index, metadata
     except Exception as e:
-        st.error(f"Failed to load vector store: {e}")
+        st.error(f"Failed to load vector store from GCS: {e}")
         return None, None
 
 def find_relevant_insights(query: str, index, metadata, model, k=5) -> str:
@@ -173,10 +182,11 @@ def find_relevant_insights(query: str, index, metadata, model, k=5) -> str:
     results = [metadata[i]["text"] for i in indices[0] if i < len(metadata)]
     return "\n\n---\n\n".join(results)
 
-def find_relevant_insights_batch(queries: list[str], index, metadata, model, k=5) -> list[dict]:
+def find_relevant_insights_batch(queries: list[str], index, metadata, model, k=5, days_filter: int = None) -> list[dict]:
     """
     Finds relevant text chunks for a batch of queries, which is much more
     performant than calling find_relevant_insights for each query individually.
+    It can also filter results to include only documents within a specific number of days.
 
     Args:
         queries (list[str]): A list of query strings.
@@ -184,6 +194,8 @@ def find_relevant_insights_batch(queries: list[str], index, metadata, model, k=5
         metadata: The metadata list corresponding to the index.
         model: The sentence-transformer embedding model.
         k (int): The number of nearest neighbors to retrieve.
+        days_filter (int, optional): If provided, only include results from documents
+                                     published within this many days. Defaults to None.
 
     Returns:
         list[dict]: A list of dictionaries, each with "context" and "sources" keys.
@@ -194,10 +206,15 @@ def find_relevant_insights_batch(queries: list[str], index, metadata, model, k=5
     # Encode all queries in a single batch
     query_embeddings = model.encode(queries, convert_to_numpy=True)
 
+    # If filtering by date, we need to retrieve more results initially to have a good pool for filtering.
+    search_k = k * 5 if days_filter is not None else k
+
     # FAISS search is optimized for batch queries
-    distances, indices = index.search(np.array(query_embeddings).astype("float32"), k)
+    distances, indices = index.search(np.array(query_embeddings).astype("float32"), search_k)
 
     batched_results = []
+    cutoff_date = datetime.utcnow() - timedelta(days=days_filter) if days_filter is not None else None
+
     # Process results for each query
     for i in range(len(queries)):
         query_indices = indices[i]
@@ -206,9 +223,31 @@ def find_relevant_insights_batch(queries: list[str], index, metadata, model, k=5
         sources = set()
         # Filter out invalid indices (-1) and assemble results
         for j in query_indices:
+            # Stop once we have enough results for this query
+            if len(texts) >= k:
+                break
+
             if j != -1 and j < len(metadata):
-                texts.append(metadata[j]["text"])
-                sources.add(metadata[j]["metadata"]["source"])
+                item_data = metadata[j]
+                item_metadata = item_data.get("metadata", {})
+
+                # Date filtering logic
+                if cutoff_date:
+                    item_date_str = item_metadata.get("date")
+                    if not item_date_str:
+                        continue  # Skip if no date and we are filtering
+                    try:
+                        # The date format from offline_analyzer is 'Month Day, Year'
+                        item_date = datetime.strptime(item_date_str, "%B %d, %Y")
+                        if item_date < cutoff_date:
+                            continue  # Skip if the document is too old
+                    except (ValueError, TypeError):
+                        continue # Skip if date is malformed or not a string
+
+                texts.append(item_data["text"])
+                source_doc = item_metadata.get("source")
+                if source_doc:
+                    sources.add(source_doc)
 
         context_str = "\n\n---\n\n".join(texts)
         batched_results.append({"context": context_str, "sources": sorted(list(sources))})
