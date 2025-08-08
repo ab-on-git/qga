@@ -201,6 +201,20 @@ if 'recommendations' in st.session_state and st.session_state.recommendations:
         summary_df = pd.DataFrame(summary_list)
         st.dataframe(summary_df, hide_index=True, use_container_width=True)
 
+    # Show Video Here
+    # Construct an absolute path to the video file relative to the script's location.
+    # This makes the file lookup independent of the current working directory.
+    st.subheader("Video briefing ...")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    video_path = os.path.join("..", script_dir, "5356023141593125734-sample_0.mp4")
+    if os.path.exists(video_path):
+        with st.spinner("Loading video..."):
+            with open(video_path, 'rb') as video_file:
+                video_bytes = video_file.read()
+            st.video(video_bytes)
+    else:
+        st.warning(f"Sample video file not found at the expected path: `{video_path}`. Please ensure `sample_0.mp4` is in the same directory as the script.")
+
     with st.expander("View Detailed Context and Client Allocations"):
         for asset_class, rec_data in st.session_state.recommendations.items():
             if not isinstance(rec_data, dict): continue

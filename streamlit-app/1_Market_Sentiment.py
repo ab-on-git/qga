@@ -83,12 +83,13 @@ if "video_url" not in st.session_state:
     st.session_state.video_url = None
 if "video_error" not in st.session_state:
     st.session_state.video_error = None
+if "show_video" not in st.session_state:
+    st.session_state.show_video = False
 
 #pdfs = list_pdfs(BUCKET_NAME)
 #selected_pdf = st.selectbox("Select a document", pdfs)
 
 range_options = {
-    "1 month": 30,
     "2 months": 60,
     "3 months": 90,
     "6 months": 180,
@@ -158,6 +159,7 @@ if st.button("Analyze"):
         st.session_state.document_text = all_text
         # Use rerun to update the UI and enter the feedback section below
         st.session_state.sentiment = get_prediction(all_text)
+        st.session_state.show_video = False
         st.rerun()
 
 # This block will now run after "Analyze" is clicked and the state is set
@@ -244,5 +246,34 @@ if st.session_state.sentiment:
                 st.session_state.sentiment = None
                 st.session_state.selected_pdf = None
                 st.session_state.document_text = None
+                st.session_state.show_video = False
                 st.rerun()
 
+# --- Video Generation Section ---
+# This section is now outside the main `if st.session_state.sentiment:` block
+# so that it is always visible to the user.
+st.subheader("Generate Briefing Video")
+
+# The button is disabled until a sentiment is available.
+is_disabled = st.session_state.sentiment is None
+
+if is_disabled:
+    st.info("Click 'Analyze' above to generate a sentiment before creating a video.")
+
+button_text = "Hide Video" if st.session_state.show_video else "Generate a Video of the Sentiment"
+if st.button(button_text, disabled=is_disabled):
+    st.session_state.show_video = not st.session_state.show_video
+    st.rerun()
+
+if st.session_state.show_video and not is_disabled:
+    # Construct an absolute path to the video file relative to the script's location.
+    # This makes the file lookup independent of the current working directory.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    video_path = os.path.join(script_dir, "5356023141593125734-sample_0.mp4")
+    if os.path.exists(video_path):
+        with st.spinner("Loading video..."):
+            with open(video_path, 'rb') as video_file:
+                video_bytes = video_file.read()
+            st.video(video_bytes)
+    else:
+        st.warning(f"Sample video file not found at the expected path: `{video_path}`. Please ensure `sample_0.mp4` is in the same directory as the script.")
