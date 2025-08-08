@@ -88,7 +88,6 @@ if not client_profile_df.empty:
 
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**Current Allocation**")
             fig1 = px.pie(
                 names=asset_classes,
                 values=current_values,
@@ -97,7 +96,6 @@ if not client_profile_df.empty:
             )
             st.plotly_chart(fig1, use_container_width=True)
         with col2:
-            st.markdown("**Target Allocation**")
             fig2 = px.pie(
                 names=asset_classes,
                 values=target_values,
