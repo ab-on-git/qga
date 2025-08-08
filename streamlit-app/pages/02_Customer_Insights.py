@@ -75,15 +75,45 @@ selected_client = st.selectbox(
 # Get the selected client's profile
 client_profile_df = portfolio_df[portfolio_df["CustomerName"] == selected_client].copy()
 
+import plotly.express as px
+
 st.header(f"2. Portfolio Overview for {selected_client}")
 if not client_profile_df.empty:
-    st.dataframe(
-        client_profile_df[[
-            "InvestmentObjective", "RiskLevel", "CurrentAllocation", "TargetAllocation"
-        ]],
-        hide_index=True,
-        use_container_width=True
-    )
+    try:
+        current_alloc = json.loads(client_profile_df.iloc[0]['CurrentAllocation'])
+        target_alloc = json.loads(client_profile_df.iloc[0]['TargetAllocation'])
+        asset_classes = sorted(set(current_alloc.keys()) | set(target_alloc.keys()))
+        current_values = [current_alloc.get(ac, 0) for ac in asset_classes]
+        target_values = [target_alloc.get(ac, 0) for ac in asset_classes]
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Current Allocation**")
+            fig1 = px.pie(
+                names=asset_classes,
+                values=current_values,
+                title="Current Allocation",
+                hole=0.3
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+        with col2:
+            st.markdown("**Target Allocation**")
+            fig2 = px.pie(
+                names=asset_classes,
+                values=target_values,
+                title="Target Allocation",
+                hole=0.3
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Could not parse allocation details: {e}")
+        st.dataframe(
+            client_profile_df[[
+                "InvestmentObjective", "RiskLevel", "CurrentAllocation", "TargetAllocation"
+            ]],
+            hide_index=True,
+            use_container_width=True
+        )
 else:
     st.warning(f"No portfolio data found for {selected_client}.")
 
@@ -228,11 +258,15 @@ if 'recommendations' in st.session_state and st.session_state.recommendations:
             try:
                 current_alloc = json.loads(client_profile_df.iloc[0]['CurrentAllocation'])
                 target_alloc = json.loads(client_profile_df.iloc[0]['TargetAllocation'])
-                #st.metric(label=f"Current {asset_class} Allocation", value=f"{current_alloc.get(asset_class, 0)}%")
-                #st.metric(label=f"Target {asset_class} Allocation", value=f"{target_alloc.get(asset_class, 0)}%")
+                ca = current_alloc.get(asset_class, 0)
+                ta = target_alloc.get(asset_class, 0)
+                alloc_df = pd.DataFrame({
+                    " ": ["Current Allocation (%)", "Target Allocation (%)"],
+                    asset_class: [ca, ta]
+                })
+                st.table(alloc_df.set_index(" "))
             except (json.JSONDecodeError, KeyError, IndexError):
                 st.caption("Could not display allocation details.")
-
             # Display context from RAG
             context_data = st.session_state.context_data.get(asset_class, {})
             st.markdown("**Source Context Used for Recommendation:**")
