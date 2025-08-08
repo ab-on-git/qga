@@ -120,7 +120,7 @@ def generate_gemini_content(prompt: str, model_id: str = "gemini-2.5-pro"):
     """Calls the Gemini API to generate content."""
     # Log the prompt to the console for debugging purposes
     print("\n--- PROMPT SENT TO GEMINI ---\n")
-    print(prompt)
+    #print(prompt)
     print("\n-----------------------------\n")
 
     token = get_access_token()
