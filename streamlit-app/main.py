@@ -76,9 +76,16 @@ if "selected_pdf" not in st.session_state:
     st.session_state.selected_pdf = None
 if "document_text" not in st.session_state:
     st.session_state.document_text = None
+if "video_operation_name" not in st.session_state:
+    st.session_state.video_operation_name = None
+if "video_url" not in st.session_state:
+    st.session_state.video_url = None
+if "video_error" not in st.session_state:
+    st.session_state.video_error = None
 
-pdfs = list_pdfs(BUCKET_NAME)
-selected_pdf = st.selectbox("Select a document", pdfs)
+#pdfs = list_pdfs(BUCKET_NAME)
+#selected_pdf = st.selectbox("Select a document", pdfs)
+
 range_options = {
     "1 week": 7,
     "2 weeks": 14,
@@ -88,7 +95,7 @@ range_options = {
     "6 months": 180,
     "1 year": 365,
 }
-selected_range = st.selectbox("Select document date range", list(range_options.keys()))
+selected_range = st.selectbox("Select document date range for analysis", list(range_options.keys()))
 
 def get_documents_in_range(project_id, dataset_id, table_id, days):
     client = bigquery.Client(project=project_id)
@@ -238,3 +245,4 @@ if st.session_state.sentiment:
                 st.session_state.selected_pdf = None
                 st.session_state.document_text = None
                 st.rerun()
+
